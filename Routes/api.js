@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const {fetchurl} = require('../controllers/bot');
+const {navigate} = require('../controllers/bot');
 
-router.get('/url', async (req, res)  => {
+router.get('/navigate', async (req, res) => {
     try {
-        await fetchurl(req.query.url).then((title) => {
-            res.status(200).json({title: title});
+        await navigate(req.query.url, req.query.search).then(() => {
+            res.status(200).json({message: 'Navigation successful'});
         });
     } catch (error) {
-        res.status(500, {message: error.message});
+        res.status(500).json({message: error.message});
     }
-});
+})
 
 module.exports = router; 
