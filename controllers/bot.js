@@ -73,13 +73,11 @@ const navigate = async (url, search) => {
   let driver = null;
   try {
     driver = await initializeDriver(url);
-
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
       "Search box not found"
     );
-
     await driver.executeScript(
       `
             const select = arguments[0];
@@ -96,15 +94,18 @@ const navigate = async (url, search) => {
       searchBox,
       search
     );
-
     const submit = await driver.wait(
       until.elementLocated(By.tagName("input")),
       CONFIG.TIMEOUT,
       "Submit button not found"
     );
     await submit.click();
-
-    return await getElements(driver);
+    let elements = await getElements(driver);
+    let result = elements.reduce((acc, curr) => {
+        acc.push(curr["attributes"]["href"]);
+        return acc;
+    }, []);
+    return result
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
