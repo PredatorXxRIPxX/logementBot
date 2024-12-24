@@ -19,7 +19,6 @@ const checkAvailability = async (driver, urls) => {
                 CONFIG.TIMEOUT,
                 "Reservation button not found"
             );
-            
             const isDisplayed = await element.isDisplayed();
             if (isDisplayed) {
                 availableUrls.push(url);
@@ -134,9 +133,9 @@ const navigate = async (url, search) => {
     const urls = elements
       .filter(elem => elem.attributes.href && elem.attributes.href !== CONFIG.DEFAULT_NONE)
       .map(elem => elem.attributes.href).filter(url => url.includes("ville"));
-    console.log("URLs found:", urls);
-    return urls;
-    //await checkAvailability(driver, urls);
+    
+    return await checkAvailability(driver, urls);
+    
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
