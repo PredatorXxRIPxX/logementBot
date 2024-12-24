@@ -13,7 +13,7 @@ router.get("/navigate", async (req, res) => {
     }
 
     const result = await navigate(url, search);
-
+    
     res.status(200).json({
       message: "Navigation successful",
       data: result,
