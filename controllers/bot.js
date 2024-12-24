@@ -1,36 +1,52 @@
 const { Builder, By, Key, until } = require("selenium-webdriver");
-
+const firefox = require("selenium-webdriver/firefox");
 
 const CONFIG = {
-  TIMEOUT: 10000,
+  TIMEOUT: 3000,
   BROWSER: "firefox",
   DEFAULT_EMPTY: "(empty)",
   DEFAULT_NONE: "(none)",
 };
 
 const checkAvailability = async (driver, urls) => {
-    const availableUrls = [];
-    
-    for (const url of urls) {
-        try {
-            await driver.get(url);
-            const element = await driver.wait(
-                until.elementLocated(By.className('btn_reserver')),
-                CONFIG.TIMEOUT,
-                "Reservation button not found"
-            );
-            const isDisplayed = await element.isDisplayed();
-            if (isDisplayed) {
-                availableUrls.push(url);
-            }
-        } catch (error) {
-            console.error(`Error checking URL ${url}:`, error.message);
-            
-            continue;
+  const availableUrls = [];
+
+  for (const url of urls) {
+    try {
+      await driver.get(url);
+
+      const logement = await driver.wait(
+        until.elementLocated(By.className("medium-2 large-3 columns  liste-residence-recap")),
+        CONFIG.TIMEOUT,
+        "Logement not found"
+      );
+
+      if (logement) {
+        const logementInfo = await getElementInfo(logement);
+
+        if (logementInfo.attributes.href) {
+          await driver.get(logementInfo.attributes.href);
+
+          const element = await driver.wait(
+            until.elementLocated(By.className("btn_reserver")),
+            CONFIG.TIMEOUT,
+            "Reservation button not found"
+          );
+
+          const isDisplayed = await element.isDisplayed();
+          if (isDisplayed) {
+            availableUrls.push(url);
+            console.log(`URL ${url} is available for reservation`);
+          }
         }
+      }
+    } catch (error) {
+      console.error(`Error checking URL ${url}:`, error.message);
+      continue;
     }
-    
-    return availableUrls;
+  }
+
+  return availableUrls;
 };
 
 const getElementInfo = async (element) => {
@@ -73,8 +89,29 @@ const getElementInfo = async (element) => {
 const initializeDriver = async (url) => {
   let driver = null;
   try {
-    driver = await new Builder().forBrowser(CONFIG.BROWSER).build();
-    await driver.manage().setTimeouts({ implicit: CONFIG.TIMEOUT });
+    const options = new firefox.Options();
+    options.addArguments("-headless");
+    options.addArguments("--width=1920");
+    options.addArguments("--height=1080");
+    options.setPreference("browser.download.folderList", 2);
+    options.setPreference("browser.download.manager.showWhenStarting", false);
+    options.setPreference(
+      "browser.helperApps.neverAsk.saveToDisk",
+      "application/pdf,application/x-pdf"
+    );
+    options.setPreference("pdfjs.disabled", true);
+
+    driver = await new Builder()
+      .forBrowser(CONFIG.BROWSER)
+      .setFirefoxOptions(options)
+      .build();
+
+    await driver.manage().setTimeouts({
+      implicit: CONFIG.TIMEOUT,
+      pageLoad: CONFIG.TIMEOUT,
+      script: CONFIG.TIMEOUT,
+    });
+
     await driver.get(url);
     return driver;
   } catch (error) {
@@ -98,7 +135,7 @@ const navigate = async (url, search) => {
   let driver = null;
   try {
     driver = await initializeDriver(url);
-    
+
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
@@ -131,11 +168,14 @@ const navigate = async (url, search) => {
 
     const elements = await getElements(driver);
     const urls = elements
-      .filter(elem => elem.attributes.href && elem.attributes.href !== CONFIG.DEFAULT_NONE)
-      .map(elem => elem.attributes.href).filter(url => url.includes("ville"));
-    
+      .filter(
+        (elem) =>
+          elem.attributes.href && elem.attributes.href !== CONFIG.DEFAULT_NONE
+      )
+      .map((elem) => elem.attributes.href)
+      .filter((url) => url.includes("ville"));
+
     return await checkAvailability(driver, urls);
-    
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
