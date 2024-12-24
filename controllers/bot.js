@@ -1,11 +1,37 @@
 const { Builder, By, Key, until } = require("selenium-webdriver");
-const express = require("express");
+
 
 const CONFIG = {
   TIMEOUT: 10000,
   BROWSER: "firefox",
   DEFAULT_EMPTY: "(empty)",
   DEFAULT_NONE: "(none)",
+};
+
+const checkAvailability = async (driver, urls) => {
+    const availableUrls = [];
+    
+    for (const url of urls) {
+        try {
+            await driver.get(url);
+            const element = await driver.wait(
+                until.elementLocated(By.className('btn_reserver')),
+                CONFIG.TIMEOUT,
+                "Reservation button not found"
+            );
+            
+            const isDisplayed = await element.isDisplayed();
+            if (isDisplayed) {
+                availableUrls.push(url);
+            }
+        } catch (error) {
+            console.error(`Error checking URL ${url}:`, error.message);
+            
+            continue;
+        }
+    }
+    
+    return availableUrls;
 };
 
 const getElementInfo = async (element) => {
@@ -73,39 +99,44 @@ const navigate = async (url, search) => {
   let driver = null;
   try {
     driver = await initializeDriver(url);
+    
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
       "Search box not found"
     );
+
     await driver.executeScript(
       `
-            const select = arguments[0];
-            const value = arguments[1];
-            const option = Array.from(select.options).find(opt => 
-                opt.text.toLowerCase().includes(value.toLowerCase())
-            );
-            if (option) {
-                select.value = option.value;
-                const event = new Event('change', { bubbles: true });
-                select.dispatchEvent(event);
-            }
-        `,
+        const select = arguments[0];
+        const value = arguments[1];
+        const option = Array.from(select.options).find(opt =>
+            opt.text.toLowerCase().includes(value.toLowerCase())
+        );
+        if (option) {
+            select.value = option.value;
+            const event = new Event('change', { bubbles: true });
+            select.dispatchEvent(event);
+        }
+      `,
       searchBox,
       search
     );
+
     const submit = await driver.wait(
       until.elementLocated(By.tagName("input")),
       CONFIG.TIMEOUT,
       "Submit button not found"
     );
     await submit.click();
-    let elements = await getElements(driver);
-    let result = elements.reduce((acc, curr) => {
-        acc.push(curr["attributes"]["href"]);
-        return acc;
-    }, []);
-    return result
+
+    const elements = await getElements(driver);
+    const urls = elements
+      .filter(elem => elem.attributes.href && elem.attributes.href !== CONFIG.DEFAULT_NONE)
+      .map(elem => elem.attributes.href).filter(url => url.includes("ville"));
+    console.log("URLs found:", urls);
+    return urls;
+    //await checkAvailability(driver, urls);
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
