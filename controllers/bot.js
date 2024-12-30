@@ -27,6 +27,7 @@ const checkAvailability = async (driver, urls) => {
         if (logementInfo.attributes && logementInfo.attributes.href) {
 
           await driver.get(logementInfo.attributes.href);
+          
           console.log("URL:", driver.getcurrentUrl());
           
           const element = await driver.wait(
