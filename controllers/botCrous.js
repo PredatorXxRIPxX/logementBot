@@ -93,6 +93,33 @@ async function checkSearchResults(driver) {
   }
 }
 
+// Display names and addresses
+async function displayNamesAndAddresses(driver) {
+  try {
+    const resultsContainer = await driver.wait(
+      until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
+      CONFIG.TIMEOUT,
+      "Results container not found"
+    );
+
+    const listItems = await resultsContainer.findElements(By.tagName("li"));
+    console.log("Found the following locations:");
+
+    for (const item of listItems) {
+      const titleElement = await item.findElement(By.css(".fr-card__title a"));
+      const addressElement = await item.findElement(By.css(".fr-card__detail"));
+
+      const titleText = await titleElement.getText();
+      const addressText = await addressElement.getText();
+
+      console.log(`Name: ${titleText}`);
+      console.log(`Address: ${addressText}`);
+    }
+  } catch (error) {
+    throw new Error(`Failed to display names and addresses: ${error.message}`);
+  }
+}
+
 // Main execution function
 async function main() {
   let driver;
@@ -112,6 +139,10 @@ async function main() {
     // Check results
     const hasNonUlisResults = await checkSearchResults(driver);
     console.log("Search results contain non-Ulis items:", hasNonUlisResults);
+
+    if (hasNonUlisResults) {
+      await displayNamesAndAddresses(driver);
+    }
 
     return hasNonUlisResults;
   } catch (error) {
@@ -141,5 +172,6 @@ if (require.main === module) {
 module.exports = {
   searchLocation,
   checkSearchResults,
+  displayNamesAndAddresses,
   main
 };
