@@ -26,40 +26,48 @@ function getFirefoxOptions() {
 }
 
 // Fill search field and click search button
+// Fill search field and click search button
 async function searchLocation(driver) {
-  try {
-    // Wait for input element to be present
-    const inputElement = await driver.wait(
-      until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-input")),
-      CONFIG.TIMEOUT,
-      "Search input not found"
-    );
-
-    // Clear existing text and enter new search term
-    await inputElement.clear();
-    await inputElement.sendKeys("Île-de-France");
-    
-    // Wait for autocomplete suggestions (if any)
-    await driver.sleep(1000);
-
-    // Wait for button and click
-    const buttonElement = await driver.wait(
-      until.elementLocated(By.css("button.fr-btn.svelte-w11odb")),
-      CONFIG.TIMEOUT,
-      "Search button not found"
-    );
-    await buttonElement.click();
-
-    // Wait for results to load
-    await driver.wait(
-      until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-      CONFIG.TIMEOUT,
-      "Search results not loaded"
-    );
-  } catch (error) {
-    throw new Error(`Failed to perform search: ${error.message}`);
+    try {
+      // Wait for input element to be present
+      const inputElement = await driver.wait(
+        until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-input")),
+        CONFIG.TIMEOUT,
+        "Search input not found"
+      );
+  
+      // Clear existing text and enter new search term
+      await inputElement.clear();
+      await inputElement.sendKeys("Île-de-France");
+  
+      // Wait for the field to update and confirm its content
+      const enteredText = await inputElement.getAttribute("value");
+      if (enteredText !== "Île-de-France") {
+        throw new Error("Search input does not contain the expected value 'Île-de-France'.");
+      }
+  
+      // Wait for autocomplete suggestions (if any)
+      await driver.sleep(1000);
+  
+      // Wait for button and click
+      const buttonElement = await driver.wait(
+        until.elementLocated(By.css("button.fr-btn.svelte-w11odb")),
+        CONFIG.TIMEOUT,
+        "Search button not found"
+      );
+      await buttonElement.click();
+  
+      // Wait for results to load
+      await driver.wait(
+        until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
+        CONFIG.TIMEOUT,
+        "Search results not loaded"
+      );
+    } catch (error) {
+      throw new Error(`Failed to perform search: ${error.message}`);
+    }
   }
-}
+  
 
 // Check search results
 async function checkSearchResults(driver) {
