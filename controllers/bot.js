@@ -10,6 +10,18 @@ const CONFIG = {
 
 const checkAvailability = async (driver, urls) => {
   const availableUrls = [];
+  
+  const options = new firefox.Options();
+    options.addArguments("-headless");
+    options.addArguments("--width=1920");
+    options.addArguments("--height=1080");
+    options.setPreference("browser.download.folderList", 2);
+    options.setPreference("browser.download.manager.showWhenStarting", false);
+    options.setPreference(
+      "browser.helperApps.neverAsk.saveToDisk",
+      "application/pdf,application/x-pdf"
+    );
+    options.setPreference("pdfjs.disabled", true);
 
   for (const url of urls) {
     try {
@@ -25,9 +37,13 @@ const checkAvailability = async (driver, urls) => {
         const logementInfo = await getElementInfo(logement);
         console.log(logementInfo.attributes.href);
     if (logementInfo.attributes && logementInfo.attributes.href) {
-        await driver.get(logementInfo.attributes.href);
+        let minidriver = await new Builder()
+        .forBrowser(CONFIG.BROWSER)
+        .setFirefoxOptions(options)
+        .build();
+        await minidriver.get(logementInfo.attributes.href);
         
-        const elements = await driver.wait(until.elementsLocated(By.className('btn btn-primary btn-lg btn-block')), CONFIG.TIMEOUT);
+        const elements = await minidriver.wait(until.elementsLocated(By.className('btn btn-primary btn-lg btn-block')), CONFIG.TIMEOUT);
         
         let elementinfo = await getElementInfo(elements);
         console.log(elementinfo.text);
