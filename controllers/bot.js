@@ -8,10 +8,9 @@ const CONFIG = {
   DEFAULT_NONE: "(none)",
 };
 
-const checkAvailability = async (driver, urls) => {
-  const availableUrls = [];
-  
-  const options = new firefox.Options();
+const initializeDriver = async () => {
+  try {
+    const options = new firefox.Options();
     options.addArguments("-headless");
     options.addArguments("--width=1920");
     options.addArguments("--height=1080");
@@ -23,44 +22,21 @@ const checkAvailability = async (driver, urls) => {
     );
     options.setPreference("pdfjs.disabled", true);
 
-  for (const url of urls) {
-    try {
-      await driver.get(url);
+    const driver = await new Builder()
+      .forBrowser(CONFIG.BROWSER)
+      .setFirefoxOptions(options)
+      .build();
 
-      const logement = await driver.wait(
-        until.elementLocated(By.className("residence-gtm")),
-        CONFIG.TIMEOUT,
-        "Logement not found"
-      );
+    await driver.manage().setTimeouts({
+      implicit: CONFIG.TIMEOUT,
+      pageLoad: CONFIG.TIMEOUT,
+      script: CONFIG.TIMEOUT,
+    });
 
-      if (logement) {
-        const logementInfo = await getElementInfo(logement);
-        console.log(logementInfo.attributes.href);
-    if (logementInfo.attributes && logementInfo.attributes.href) {
-        let minidriver = await new Builder()
-        .forBrowser(CONFIG.BROWSER)
-        .setFirefoxOptions(options)
-        .build();
-        await minidriver.get(logementInfo.attributes.href);
-        
-        const elements = await minidriver.wait(until.elementsLocated(By.className('btn btn-primary btn-lg btn-block')), CONFIG.TIMEOUT);
-        
-        let elementinfo = await getElementInfo(elements);
-        console.log(elementinfo.text);
-        if (elementinfo) {
-          availableUrls.push(logementInfo.attributes.href);
-        }
-        console.log(elementinfo);
-        
-    }
-      }
-    } catch (error) {
-      console.error(`Error checking URL ${url}:`, error.message);
-      continue; // Continue with the next URL if there's an error
-    }
+    return driver;
+  } catch (error) {
+    throw new Error(`Failed to initialize driver: ${error.message}`);
   }
-
-  return availableUrls;
 };
 
 const getElementInfo = async (element) => {
@@ -95,81 +71,74 @@ const getElementInfo = async (element) => {
       },
     };
   } catch (error) {
-    console.error("Error getting element info:", error.message);
     throw new Error(`Failed to get element info: ${error.message}`);
   }
 };
 
-const initializeDriver = async (url) => {
-  let driver = null;
+const checkAvailability = async (urls) => {
+  const availableUrls = [];
+  const driver = await initializeDriver();
+
   try {
-    const options = new firefox.Options();
-    options.addArguments("-headless");
-    options.addArguments("--width=1920");
-    options.addArguments("--height=1080");
-    options.setPreference("browser.download.folderList", 2);
-    options.setPreference("browser.download.manager.showWhenStarting", false);
-    options.setPreference(
-      "browser.helperApps.neverAsk.saveToDisk",
-      "application/pdf,application/x-pdf"
-    );
-    options.setPreference("pdfjs.disabled", true);
+    for (const url of urls) {
+      try {
+        await driver.get(url);
 
-    driver = await new Builder()
-      .forBrowser(CONFIG.BROWSER)
-      .setFirefoxOptions(options)
-      .build();
+        const logement = await driver.wait(
+          until.elementLocated(By.className("residence-gtm")),
+          CONFIG.TIMEOUT,
+          "Logement not found"
+        );
 
-    await driver.manage().setTimeouts({
-      implicit: CONFIG.TIMEOUT,
-      pageLoad: CONFIG.TIMEOUT,
-      script: CONFIG.TIMEOUT,
-    });
-    
+        if (logement) {
+          const logementInfo = await getElementInfo(logement);
+          await driver.get(logementInfo.attributes.href);
+          console.log(await driver.getCurrentUrl());
+          const elements = await driver.wait(
+            until.elementsLocated(By.className("btn_reserver tooltip"), CONFIG.TIMEOUT),
+          );
 
-    await driver.get(url);
-    return driver;
-  } catch (error) {
-    if (driver) {
-      await driver.quit();
+          for (const element of elements) {
+            const elementInfo = await getElementInfo(element);
+            if (elementInfo) {
+              availableUrls.push(logementInfo.attributes.href);
+            }
+            console.log(elementInfo);
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking URL ${url}:`, error.message);
+      }
     }
-    throw new Error(`Failed to initialize driver: ${error.message}`);
+  } finally {
+    await driver.quit();
   }
-};
 
-const getElements = async (driver) => {
-  try {
-    const elements = await driver.findElements(By.tagName("a"));
-    return Promise.all(elements.map(getElementInfo));
-  } catch (error) {
-    throw new Error(`Failed to get elements: ${error.message}`);
-  }
+  return availableUrls;
 };
 
 const navigate = async (url, search) => {
-  let driver = null;
+  const driver = await initializeDriver();
   try {
-    driver = await initializeDriver(url);
-
-
+    await driver.get(url);
 
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
       "Search box not found"
     );
-  
+
     await driver.executeScript(
       `
         const select = arguments[0];
         const value = arguments[1];
         const option = Array.from(select.options).find(opt =>
-            opt.text.toLowerCase().includes(value.toLowerCase())
+          opt.text.toLowerCase().includes(value.toLowerCase())
         );
         if (option) {
-            select.value = option.value;
-            const event = new Event('change', { bubbles: true });
-            select.dispatchEvent(event);
+          select.value = option.value;
+          const event = new Event('change', { bubbles: true });
+          select.dispatchEvent(event);
         }
       `,
       searchBox,
@@ -183,22 +152,19 @@ const navigate = async (url, search) => {
     );
     await submit.click();
 
-    const elements = await getElements(driver);
-    const urls = elements
-      .filter(
-        (elem) =>
-          elem.attributes.href && elem.attributes.href !== CONFIG.DEFAULT_NONE
-      )
-      .map((elem) => elem.attributes.href)
-      .filter((url) => url.includes("ville"));
+    const elements = await driver.findElements(By.tagName("a"));
+    const urls = await Promise.all(
+      elements.map(async (element) => {
+        const href = await element.getAttribute("href");
+        return href && href.includes("ville") ? href : null;
+      })
+    );
 
-    return await checkAvailability(driver, urls);
+    return await checkAvailability(urls.filter(Boolean));
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
-    if (driver) {
-      await driver.quit().catch(console.error);
-    }
+    await driver.quit();
   }
 };
 
