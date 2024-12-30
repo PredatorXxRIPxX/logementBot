@@ -24,25 +24,19 @@ const checkAvailability = async (driver, urls) => {
       if (logement) {
         const logementInfo = await getElementInfo(logement);
         console.log(logementInfo.attributes.href);
-        if (logementInfo.attributes && logementInfo.attributes.href) {
-
-          await driver.get(logementInfo.attributes.href);
-          
-          console.log("URL:", driver.getcurrentUrl());
-          
-          const element = await driver.wait(
-            until.elementLocated(By.className("btn_reserver tooltip")),
-            CONFIG.TIMEOUT
-          );
-
-          const elementInfo = await getElementInfo(element);
-          console.log(elementInfo); 
-          const isDisplayed = await element.isDisplayed(); 
-          if (isDisplayed) {
-            availableUrls.push(url);
-            console.log(`URL ${url} is available for reservation`);
-          }
+    if (logementInfo.attributes && logementInfo.attributes.href) {
+        await driver.get(logementInfo.attributes.href);
+        
+        const elements = await driver.wait(until.elementsLocated(By.className('btn btn-primary btn-lg btn-block')), CONFIG.TIMEOUT);
+        
+        let elementinfo = await getElementInfo(elements);
+        console.log(elementinfo.text);
+        if (elementinfo) {
+          availableUrls.push(logementInfo.attributes.href);
         }
+        console.log(elementinfo);
+        
+    }
       }
     } catch (error) {
       console.error(`Error checking URL ${url}:`, error.message);
@@ -115,6 +109,7 @@ const initializeDriver = async (url) => {
       pageLoad: CONFIG.TIMEOUT,
       script: CONFIG.TIMEOUT,
     });
+    
 
     await driver.get(url);
     return driver;
@@ -140,12 +135,14 @@ const navigate = async (url, search) => {
   try {
     driver = await initializeDriver(url);
 
+
+
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
       "Search box not found"
     );
-
+  
     await driver.executeScript(
       `
         const select = arguments[0];
