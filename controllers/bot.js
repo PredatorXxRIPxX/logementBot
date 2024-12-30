@@ -16,24 +16,27 @@ const checkAvailability = async (driver, urls) => {
       await driver.get(url);
 
       const logement = await driver.wait(
-        until.elementLocated(By.className("medium-2 large-3 columns  liste-residence-recap")),
+        until.elementLocated(By.className("residence-gtm")),
         CONFIG.TIMEOUT,
         "Logement not found"
       );
 
       if (logement) {
         const logementInfo = await getElementInfo(logement);
+        console.log(logementInfo.attributes.href);
+        if (logementInfo.attributes && logementInfo.attributes.href) {
 
-        if (logementInfo.attributes.href) {
           await driver.get(logementInfo.attributes.href);
-
+          console.log("URL:", driver.getcurrentUrl());
+          
           const element = await driver.wait(
-            until.elementLocated(By.className("btn_reserver")),
-            CONFIG.TIMEOUT,
-            "Reservation button not found"
+            until.elementLocated(By.className("btn_reserver tooltip")),
+            CONFIG.TIMEOUT
           );
 
-          const isDisplayed = await element.isDisplayed();
+          const elementInfo = await getElementInfo(element);
+          console.log(elementInfo); 
+          const isDisplayed = await element.isDisplayed(); 
           if (isDisplayed) {
             availableUrls.push(url);
             console.log(`URL ${url} is available for reservation`);
@@ -42,7 +45,7 @@ const checkAvailability = async (driver, urls) => {
       }
     } catch (error) {
       console.error(`Error checking URL ${url}:`, error.message);
-      continue;
+      continue; // Continue with the next URL if there's an error
     }
   }
 
