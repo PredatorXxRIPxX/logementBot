@@ -12,136 +12,116 @@ const CONFIG = {
 // Configure Firefox options
 function getFirefoxOptions() {
   const options = new firefox.Options();
-  options.addArguments("-headless");
+  // Supprimer l'option -headless pour voir le navigateur en mode normal
+  // options.addArguments("-headless");
   options.addArguments("--width=1920");
   options.addArguments("--height=1080");
-  options.setPreference("browser.download.folderList", 2);
-  options.setPreference("browser.download.manager.showWhenStarting", false);
-  options.setPreference(
-    "browser.helperApps.neverAsk.saveToDisk",
-    "application/pdf,application/x-pdf"
-  );
-  options.setPreference("pdfjs.disabled", true);
   return options;
 }
 
 // Fill search field and click search button
-// Fill search field and click search button
 async function searchLocation(driver) {
-    try {
-      // Wait for input element to be present
-      const inputElement = await driver.wait(
-        until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-input")),
-        CONFIG.TIMEOUT,
-        "Search input not found"
-      );
-  
-      // Clear existing text and enter new search term
-      await inputElement.clear();
-      await inputElement.sendKeys("Île-de-France");
-  
-      // Wait for the field to update and confirm its content
-      const enteredText = await inputElement.getAttribute("value");
-      if (enteredText !== "Île-de-France") {
-        throw new Error("Search input does not contain the expected value 'Île-de-France'.");
-      }
-  
-      // Wait for autocomplete suggestions (if any)
-      await driver.sleep(1000);
-  
-      // Wait for button and click
-      const buttonElement = await driver.wait(
-        until.elementLocated(By.css("button.fr-btn.svelte-w11odb")),
-        CONFIG.TIMEOUT,
-        "Search button not found"
-      );
-      await buttonElement.click();
-  
-      // Wait for results to load
-      await driver.wait(
-        until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-        CONFIG.TIMEOUT,
-        "Search results not loaded"
-      );
-    } catch (error) {
-      throw new Error(`Failed to perform search: ${error.message}`);
-    }
-  }
-  
-
-// Check search results
-async function checkSearchResults(driver) {
   try {
-    // Wait for results container
+    console.log("Waiting for the input field...");
+    const inputElement = await driver.wait(
+      until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-input")),
+      CONFIG.TIMEOUT,
+      "Search input not found"
+    );
+
+    console.log("Clearing input and typing 'Île-de-France'...");
+    await inputElement.clear();
+    await inputElement.sendKeys("Île-de-France");
+
+    console.log("Waiting for autocomplete suggestions...");
+    await driver.sleep(2000); // Augmenter le délai si nécessaire
+
+    // Click on the first suggestion by its ID
+    console.log("Clicking on the first suggestion...");
+    const firstSuggestion = await driver.wait(
+      until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-option--0")),
+      CONFIG.TIMEOUT,
+      "First suggestion not found"
+    );
+    await firstSuggestion.click();
+
+    console.log("Clicking search button...");
+    const buttonElement = await driver.wait(
+      until.elementLocated(By.css("button.fr-btn.svelte-w11odb")),
+      CONFIG.TIMEOUT,
+      "Search button not found"
+    );
+    await buttonElement.click();
+
+    console.log("Waiting for results to load...");
+    await driver.wait(
+      until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
+      CONFIG.TIMEOUT,
+      "Search results not loaded"
+    );
+  } catch (error) {
+    console.error("Error during search:", error.message);
+    throw error;
+  }
+}
+
+// Display names and addresses of results
+async function displayNamesAndAddresses(driver) {
+  try {
+    console.log("Fetching results...");
+
+    // Wait for the results container to load
     const resultsContainer = await driver.wait(
       until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
       CONFIG.TIMEOUT,
       "Results container not found"
     );
 
-    // Get all list items
+    // Get all list items (residences)
     const listItems = await resultsContainer.findElements(By.tagName("li"));
-    
+
     if (listItems.length === 0) {
-      return false;
+      console.log("No results found.");
+      return;
     }
 
-    // Check if any non-"Ulis" titles exist
+    // Extract and display names and addresses
     for (const item of listItems) {
-      const titleElement = await item.findElement(By.css(".fr-card__title a"));
-      const titleText = await titleElement.getText();
-      if (titleText !== "Ulis") {
-        return true;
+      let titleText = '';
+      let addressText = '';
+
+      // Try to get the title
+      try {
+        const titleElement = await item.findElement(By.css(".fr-card__title a"));
+        titleText = await titleElement.getText();
+      } catch (error) {
+        console.log("Title element not found in this result.");
+      }
+
+      // Try to get the address
+      try {
+        const addressElement = await item.findElement(By.css(".fr-card__desc"));
+        addressText = await addressElement.getText();
+      } catch (error) {
+        console.log("Address element not found in this result.");
+      }
+
+      if (titleText && addressText) {
+        console.log(`Name: ${titleText}`);
+        console.log(`Address: ${addressText}`);
+      } else {
+        console.log("Some elements are missing in this result.");
       }
     }
-
-    return false;
   } catch (error) {
-    throw new Error(`Failed to check search results: ${error.message}`);
+    console.error("Error during result extraction:", error.message);
   }
 }
 
-// Display names and addresses
-async function displayNamesAndAddresses(driver) {
-    try {
-      const resultsContainer = await driver.wait(
-        until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-        CONFIG.TIMEOUT,
-        "Results container not found"
-      );
-  
-      const listItems = await resultsContainer.findElements(By.tagName("li"));
-      console.log("Found the following locations:");
-  
-      for (const item of listItems) {
-        try {
-          // Try to find the title element
-          const titleElement = await item.findElement(By.css(".fr-card__title a"));
-          const titleText = await titleElement.getText();
-  
-          // Try to find the address element
-          let addressText;
-          try {
-            const addressElement = await item.findElement(By.css(".fr-card__desc"));
-            addressText = await addressElement.getText();
-          } catch (error) {
-            addressText = "Address not found";
-          }
-  
-          console.log(`Name: ${titleText}`);
-          console.log(`Address: ${addressText}`);
-        } catch (error) {
-          console.log("Skipped an item due to missing elements.");
-        }
-      }
-    } catch (error) {
-      throw new Error(`Failed to display names and addresses: ${error.message}`);
-    }
-  }  
 // Main execution function
 async function main() {
   let driver;
-  
+
   try {
     driver = await new Builder()
       .forBrowser(CONFIG.BROWSER)
@@ -154,15 +134,8 @@ async function main() {
     // Perform search
     await searchLocation(driver);
 
-    // Check results
-    const hasNonUlisResults = await checkSearchResults(driver);
-    console.log("Search results contain non-Ulis items:", hasNonUlisResults);
-
-    if (hasNonUlisResults) {
-      await displayNamesAndAddresses(driver);
-    }
-
-    return hasNonUlisResults;
+    // Display the names and addresses of the search results
+    await displayNamesAndAddresses(driver);
   } catch (error) {
     console.error("Error during execution:", error.message);
     throw error;
@@ -189,7 +162,6 @@ if (require.main === module) {
 // Export for testing
 module.exports = {
   searchLocation,
-  checkSearchResults,
   displayNamesAndAddresses,
   main
 };
