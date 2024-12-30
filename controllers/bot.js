@@ -85,27 +85,18 @@ const checkAvailability = async (urls) => {
         await driver.get(url);
 
         const logement = await driver.wait(
-          until.elementLocated(By.className("residence-gtm")),
+          until.elementsLocated(By.className("residence-gtm")),
           CONFIG.TIMEOUT,
           "Logement not found"
         );
 
         if (logement) {
-          const logementInfo = await getElementInfo(logement);
-          await driver.get(logementInfo.attributes.href);
-          console.log(await driver.getCurrentUrl());
-          const elements = await driver.wait(
-            until.elementsLocated(By.className("btn_reserver tooltip"), CONFIG.TIMEOUT),
-          );
-
-          for (const element of elements) {
-            const elementInfo = await getElementInfo(element);
-            if (elementInfo) {
-              availableUrls.push(logementInfo.attributes.href);
-            }
-            console.log(elementInfo);
+          for (const element of logement) {
+            const logementInfo = await getElementInfo(element);
+            console.log("Logement:", logementInfo.attributes.href);
           }
         }
+        return availableUrls;
       } catch (error) {
         console.error(`Error checking URL ${url}:`, error.message);
       }
