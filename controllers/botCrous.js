@@ -95,31 +95,41 @@ async function checkSearchResults(driver) {
 
 // Display names and addresses
 async function displayNamesAndAddresses(driver) {
-  try {
-    const resultsContainer = await driver.wait(
-      until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-      CONFIG.TIMEOUT,
-      "Results container not found"
-    );
-
-    const listItems = await resultsContainer.findElements(By.tagName("li"));
-    console.log("Found the following locations:");
-
-    for (const item of listItems) {
-      const titleElement = await item.findElement(By.css(".fr-card__title a"));
-      const addressElement = await item.findElement(By.css(".fr-card__detail"));
-
-      const titleText = await titleElement.getText();
-      const addressText = await addressElement.getText();
-
-      console.log(`Name: ${titleText}`);
-      console.log(`Address: ${addressText}`);
+    try {
+      const resultsContainer = await driver.wait(
+        until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
+        CONFIG.TIMEOUT,
+        "Results container not found"
+      );
+  
+      const listItems = await resultsContainer.findElements(By.tagName("li"));
+      console.log("Found the following locations:");
+  
+      for (const item of listItems) {
+        try {
+          // Try to find the title element
+          const titleElement = await item.findElement(By.css(".fr-card__title a"));
+          const titleText = await titleElement.getText();
+  
+          // Try to find the address element
+          let addressText;
+          try {
+            const addressElement = await item.findElement(By.css(".fr-card__detail"));
+            addressText = await addressElement.getText();
+          } catch (error) {
+            addressText = "Address not found";
+          }
+  
+          console.log(`Name: ${titleText}`);
+          console.log(`Address: ${addressText}`);
+        } catch (error) {
+          console.log("Skipped an item due to missing elements.");
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to display names and addresses: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error(`Failed to display names and addresses: ${error.message}`);
-  }
-}
-
+  }  
 // Main execution function
 async function main() {
   let driver;
