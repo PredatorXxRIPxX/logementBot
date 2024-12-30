@@ -27,4 +27,6 @@ router.get("/navigate", async (req, res) => {
   }
 });
 
+router.get("/navigationcrous",async )
+
 module.exports = router;
