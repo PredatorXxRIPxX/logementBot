@@ -2,7 +2,7 @@ const { Builder, By, Key, until } = require("selenium-webdriver");
 const firefox = require("selenium-webdriver/firefox");
 
 const CONFIG = {
-  TIMEOUT: 3000,
+  TIMEOUT: 5000, // Increased timeout
   BROWSER: "firefox",
   DEFAULT_EMPTY: "(empty)",
   DEFAULT_NONE: "(none)",
@@ -75,15 +75,25 @@ const getElementInfo = async (element) => {
   }
 };
 
+// Highlight the element in the browser by changing its border color
+const highlightElement = async (driver, element) => {
+  await driver.executeScript(
+    `
+      arguments[0].style.border = '3px solid red';
+      arguments[0].style.boxShadow = '0 0 10px 2px rgba(255, 0, 0, 0.8)';
+    `,
+    element
+  );
+};
+
 const checkAvailability = async (urls) => {
   const availableUrls = [];
   const driver = await initializeDriver();
-
+  let currenturl = null;
   try {
     for (const url of urls) {
       try {
         await driver.get(url);
-
         const logement = await driver.wait(
           until.elementsLocated(By.className("residence-gtm")),
           CONFIG.TIMEOUT,
@@ -93,14 +103,37 @@ const checkAvailability = async (urls) => {
         if (logement) {
           for (const element of logement) {
             const logementInfo = await getElementInfo(element);
-            console.log("Logement:", logementInfo.attributes.href);
+            const urllogement = logementInfo.attributes.href;
+
+            await driver.get(urllogement);
+            currenturl = urllogement;
+            console.log(`Checking: ${urllogement}`);
+
+            // Log and highlight the clicked element
+            console.log(`Clicking on: ${urllogement}`);
+            await highlightElement(driver, element);
+
+            // Execute script to check for availability
+            const available = await driver.executeScript(
+              `
+                const elements = document.querySelectorAll("a");
+                return Array.from(elements).some(
+                  (element) => element.textContent.trim() === "Déposer une demande"
+                );
+              `
+            );
+
+            if (available) {
+              availableUrls.push(urllogement);
+            }
           }
         }
-        return availableUrls;
       } catch (error) {
-        console.error(`Error checking URL ${url}:`, error.message);
+        console.error(`Error checking URL ${currenturl}:`, error.message);
       }
     }
+  } catch (error) {
+    console.error(`Error during availability check:`, error.message);
   } finally {
     await driver.quit();
   }
