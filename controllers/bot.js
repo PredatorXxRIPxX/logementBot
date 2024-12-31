@@ -74,17 +74,54 @@ const getElementInfo = async (element) => {
   }
 };
 
-
-const traitdata = async (urls) => {
+const traitdata = async (urls,driver) => {
   try {
     let result = [];
     for (const url of urls) {
       try {
-        let driver = await initializeDriver();
-        await driver.get(url);
-        const reservation = await driver.findElement(By.id("iFrameResizer0"))
-        const internal_driver = reservation.getDriver()
         
+        await driver.get(url);
+
+        // Locate and switch to the iframe
+        const iframe = await driver.findElement(By.id("iFrameResizer0"));
+        await driver.switchTo().frame(iframe);
+
+        // Extract the main content inside the iframe
+        const children = await driver.executeScript(() => {
+          const parentElement = document.body;
+          return Array.from(parentElement.children).map((child) => {
+            return {
+              tagName: child.tagName,
+              text: child.innerText || null,
+              attributes: {
+                id: child.id || null,
+                class: child.className || null,
+                href: child.getAttribute("href") || null,
+                value: child.getAttribute("value") || null,
+              },
+            };
+          });
+        });
+
+        const mainContent = children.find((child) => child.tagName === "MAIN").text;
+
+        const structuredData = mainContent
+          .split("\n")
+          .reduce((acc, line) => {
+            const columns = line.split(/\s{2,}/); 
+            if (columns.length >= 3) {
+              acc.push({
+                Type: columns[0] || null,
+                "Loyer mensuel TCC*": columns[1] || null,
+                "Disponibilite": columns[2] || null,
+                Meublé: columns[3] || null,
+                Action: columns[4] || null,
+              });
+            }
+            return acc;
+          }, [])
+        console.log(structuredData);
+        await driver.switchTo().defaultContent()
       } catch (urlError) {
         console.error(`Error processing URL ${url}: ${urlError.message}`);
         continue;
@@ -96,7 +133,9 @@ const traitdata = async (urls) => {
   }
 };
 
-const checkavailability = async (logements) => {
+
+
+const checkavailability = async (logements,driver) => {
   try {
     const logementsList = await logements.findElements(
       By.className("liste-residence")
@@ -107,7 +146,7 @@ const checkavailability = async (logements) => {
       const info = await getElementInfo(element);
       urls.push(info.attributes.href);
     }
-    let finalresult = await traitdata(urls);
+    let finalresult = await traitdata(urls,driver);
     return finalresult;
   } catch (error) {
     throw new Error(`Failed to check availability: ${error.message}`);
@@ -152,7 +191,7 @@ const navigate = async (url, search) => {
     const logements = await driver.findElement(
       By.className("block-grid large-block-grid-2 small-block-grid-1")
     );
-    let result = await checkavailability(logements);
+    let result = await checkavailability(logements,driver);
     return result;
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
