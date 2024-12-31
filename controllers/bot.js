@@ -108,14 +108,13 @@ const checkAvailability = async (urls) => {
             currenturl = urllogement;
             console.log(`Checking: ${urllogement}`);
 
-            // Log and highlight the clicked element
             console.log(`Clicking on: ${urllogement}`);
             await highlightElement(driver, element);
 
-            // Execute script to check for availability
             const available = await driver.executeScript(
               `
-                const elements = document.querySelectorAll("a");
+                const elements = document.querySelectorAll(".btn_reserver tooltip");
+                console.log(elements);
                 return Array.from(elements).some(
                   (element) => element.textContent.trim() === "Déposerunedemande"
                 );
