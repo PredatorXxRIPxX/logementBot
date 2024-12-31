@@ -74,18 +74,18 @@ const getElementInfo = async (element) => {
   }
 };
 
-const traitdata = async (urls, driver) => {
+
+const traitdata = async (urls) => {
   try {
     let result = [];
     for (const url of urls) {
       try {
+        let driver = await initializeDriver();
         await driver.get(url);
-        const reservediv = await driver.findElement(By.className("reserver"));
-        const isAvailable = await reservediv.findElement(By.xpath(".//a[contains(@class, 'btn_reserver')]"));
-        console.log(isAvailable.toString());
-        if (isAvailable) {
-          result.push(url);
-        }
+        const reservation = await driver.findElement(By.id('reserver'))
+        const btn_reservation = await reservation.findElements(By.className('btn_reserver'))
+        const btn_reservation_text = await btn_reservation[0].getText()
+        console.log(btn_reservation_text)
       } catch (urlError) {
         console.error(`Error processing URL ${url}: ${urlError.message}`);
         continue;
@@ -97,7 +97,7 @@ const traitdata = async (urls, driver) => {
   }
 };
 
-const checkavailability = async (logements, driver) => {
+const checkavailability = async (logements) => {
   try {
     const logementsList = await logements.findElements(
       By.className("liste-residence")
@@ -108,7 +108,7 @@ const checkavailability = async (logements, driver) => {
       const info = await getElementInfo(element);
       urls.push(info.attributes.href);
     }
-    let finalresult = await traitdata(urls, driver);
+    let finalresult = await traitdata(urls);
     return finalresult;
   } catch (error) {
     throw new Error(`Failed to check availability: ${error.message}`);
@@ -153,8 +153,7 @@ const navigate = async (url, search) => {
     const logements = await driver.findElement(
       By.className("block-grid large-block-grid-2 small-block-grid-1")
     );
-
-    let result = await checkavailability(logements, driver);
+    let result = await checkavailability(logements);
     return result;
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
