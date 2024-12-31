@@ -82,11 +82,10 @@ const traitdata = async (urls,driver) => {
         
         await driver.get(url);
 
-        // Locate and switch to the iframe
+        
         const iframe = await driver.findElement(By.id("iFrameResizer0"));
         await driver.switchTo().frame(iframe);
 
-        // Extract the main content inside the iframe
         const children = await driver.executeScript(() => {
           const parentElement = document.body;
           return Array.from(parentElement.children).map((child) => {
@@ -120,7 +119,11 @@ const traitdata = async (urls,driver) => {
             }
             return acc;
           }, [])
-        console.log(structuredData);
+        for (const data of structuredData) {
+          if (data["Disponibilite"] != null) {
+            result.push({url,data});
+          }
+        }
         await driver.switchTo().defaultContent()
       } catch (urlError) {
         console.error(`Error processing URL ${url}: ${urlError.message}`);
