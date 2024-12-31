@@ -2,7 +2,7 @@ const { Builder, By, Key, until } = require("selenium-webdriver");
 const firefox = require("selenium-webdriver/firefox");
 
 const CONFIG = {
-  TIMEOUT: 3500, 
+  TIMEOUT: 3500,
   BROWSER: "firefox",
   DEFAULT_EMPTY: "(empty)",
   DEFAULT_NONE: "(none)",
@@ -74,76 +74,51 @@ const getElementInfo = async (element) => {
   }
 };
 
-// Highlight the element in the browser by changing its border color
-const highlightElement = async (driver, element) => {
-  await driver.executeScript(
-    `
-      arguments[0].style.border = '3px solid red';
-      arguments[0].style.boxShadow = '0 0 10px 2px rgba(255, 0, 0, 0.8)';
-    `,
-    element
-  );
-};
-
-const checkAvailability = async (urls) => {
-  const availableUrls = [];
-  const driver = await initializeDriver();
-  let currenturl = null;
+const traitdata = async (urls, driver) => {
   try {
+    let result = [];
     for (const url of urls) {
       try {
         await driver.get(url);
-        const logement = await driver.wait(
-          until.elementsLocated(By.className("residence-gtm")),
-          CONFIG.TIMEOUT,
-          "Logement not found"
-        );
-
-        if (logement) {
-          for (const element of logement) {
-            const logementInfo = await getElementInfo(element);
-            const urllogement = logementInfo.attributes.href;
-
-            await driver.get(urllogement);
-            currenturl = urllogement;
-            console.log(`Checking: ${urllogement}`);
-
-            console.log(`Clicking on: ${urllogement}`);
-            await highlightElement(driver, element);
-
-            const available = await driver.executeScript(
-              `
-                const elements = document.querySelectorAll(".btn_reserver tooltip");
-                console.log(elements);
-                return Array.from(elements).some(
-                  (element) => element.textContent.trim() === "Déposerunedemande"
-                );
-              `
-            );
-
-            if (available) {
-              availableUrls.push(urllogement);
-            }
-          }
+        const reservediv = await driver.findElement(By.className("reserver"));
+        const isAvailable = await reservediv.findElement(By.xpath(".//a[contains(@class, 'btn_reserver')]"));
+        console.log(isAvailable.toString());
+        if (isAvailable) {
+          result.push(url);
         }
-      } catch (error) {
-        console.error(`Error checking URL ${currenturl}:`, error.message);
+      } catch (urlError) {
+        console.error(`Error processing URL ${url}: ${urlError.message}`);
+        continue;
       }
     }
+    return result;
   } catch (error) {
-    console.error(`Error during availability check:`, error.message);
-  } finally {
-    await driver.quit();
+    throw new Error(`Failed to get data: ${error.message}`);
   }
+};
 
-  return availableUrls;
+const checkavailability = async (logements, driver) => {
+  try {
+    const logementsList = await logements.findElements(
+      By.className("liste-residence")
+    );
+    let urls = [];
+    for (const logement of logementsList) {
+      const element = await logement.findElement(By.className("residence-gtm"));
+      const info = await getElementInfo(element);
+      urls.push(info.attributes.href);
+    }
+    let finalresult = await traitdata(urls, driver);
+    return finalresult;
+  } catch (error) {
+    throw new Error(`Failed to check availability: ${error.message}`);
+  }
 };
 
 const navigate = async (url, search) => {
   const driver = await initializeDriver();
   try {
     await driver.get(url);
-
     const searchBox = await driver.wait(
       until.elementLocated(By.name("ville")),
       CONFIG.TIMEOUT,
@@ -172,17 +147,15 @@ const navigate = async (url, search) => {
       CONFIG.TIMEOUT,
       "Submit button not found"
     );
+
     await submit.click();
 
-    const elements = await driver.findElements(By.tagName("a"));
-    const urls = await Promise.all(
-      elements.map(async (element) => {
-        const href = await element.getAttribute("href");
-        return href && href.includes("ville") ? href : null;
-      })
+    const logements = await driver.findElement(
+      By.className("block-grid large-block-grid-2 small-block-grid-1")
     );
 
-    return await checkAvailability(urls.filter(Boolean));
+    let result = await checkavailability(logements, driver);
+    return result;
   } catch (error) {
     throw new Error(`Navigation failed: ${error.message}`);
   } finally {
