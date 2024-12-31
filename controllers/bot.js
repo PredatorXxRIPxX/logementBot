@@ -2,7 +2,7 @@ const { Builder, By, Key, until } = require("selenium-webdriver");
 const firefox = require("selenium-webdriver/firefox");
 
 const CONFIG = {
-  TIMEOUT: 5000, // Increased timeout
+  TIMEOUT: 3500, 
   BROWSER: "firefox",
   DEFAULT_EMPTY: "(empty)",
   DEFAULT_NONE: "(none)",
@@ -11,7 +11,6 @@ const CONFIG = {
 const initializeDriver = async () => {
   try {
     const options = new firefox.Options();
-    options.addArguments("-headless");
     options.addArguments("--width=1920");
     options.addArguments("--height=1080");
     options.setPreference("browser.download.folderList", 2);
@@ -118,7 +117,7 @@ const checkAvailability = async (urls) => {
               `
                 const elements = document.querySelectorAll("a");
                 return Array.from(elements).some(
-                  (element) => element.textContent.trim() === "Déposer une demande"
+                  (element) => element.textContent.trim() === "Déposerunedemande"
                 );
               `
             );
