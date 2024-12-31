@@ -82,10 +82,9 @@ const traitdata = async (urls) => {
       try {
         let driver = await initializeDriver();
         await driver.get(url);
-        const reservation = await driver.findElement(By.id('reserver'))
-        const btn_reservation = await reservation.findElements(By.className('btn_reserver'))
-        const btn_reservation_text = await btn_reservation[0].getText()
-        console.log(btn_reservation_text)
+        const reservation = await driver.findElement(By.id("iFrameResizer0"))
+        const internal_driver = reservation.getDriver()
+        
       } catch (urlError) {
         console.error(`Error processing URL ${url}: ${urlError.message}`);
         continue;
