@@ -1,63 +1,55 @@
-const { Builder, By, Key, until } = require("selenium-webdriver");
+const { Client, GatewayIntentBits } = require('discord.js');
+const { Builder, By, until } = require("selenium-webdriver");
 const firefox = require("selenium-webdriver/firefox");
 
+// Configuration du bot Discord
+const BOT_TOKEN = 'MTMyMzQyNTY5NTg3OTM5NzQ0Nw.Gz92da.A_MUioPxsmVkHoIOVgURk7kWgUO9FEn24KcpG8';
+const CHANNEL_ID = '1323725010644500553';
+
+// Configuration de votre script de logement
 const CONFIG = {
   TIMEOUT: 3000,
   BROWSER: "firefox",
-  DEFAULT_EMPTY: "(empty)",
-  DEFAULT_NONE: "(none)",
-  URL: "https://trouverunlogement.lescrous.fr/", // Add your website URL here
+  URL: "https://trouverunlogement.lescrous.fr/",
+  CHECK_INTERVAL: 20000, // 20 secondes
+  DAILY_STATUS_INTERVAL: 24 * 60 * 60 * 1000 // 24 heures en millisecondes
 };
 
 // Configure Firefox options
 function getFirefoxOptions() {
   const options = new firefox.Options();
-  // Supprimer l'option -headless pour voir le navigateur en mode normal
-  // options.addArguments("-headless");
   options.addArguments("--width=1920");
   options.addArguments("--height=1080");
   return options;
 }
 
-// Fill search field and click search button
+// Fonction de recherche
 async function searchLocation(driver) {
   try {
-    console.log("Waiting for the input field...");
     const inputElement = await driver.wait(
       until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-input")),
-      CONFIG.TIMEOUT,
-      "Search input not found"
+      CONFIG.TIMEOUT
     );
-
-    console.log("Clearing input and typing 'Île-de-France'...");
     await inputElement.clear();
     await inputElement.sendKeys("Île-de-France");
 
-    console.log("Waiting for autocomplete suggestions...");
-    await driver.sleep(2000); // Augmenter le délai si nécessaire
+    await driver.sleep(2000);
 
-    // Click on the first suggestion by its ID
-    console.log("Clicking on the first suggestion...");
     const firstSuggestion = await driver.wait(
       until.elementLocated(By.id("PlaceAutocompletearia-autocomplete-1-option--0")),
-      CONFIG.TIMEOUT,
-      "First suggestion not found"
+      CONFIG.TIMEOUT
     );
     await firstSuggestion.click();
 
-    console.log("Clicking search button...");
     const buttonElement = await driver.wait(
       until.elementLocated(By.css("button.fr-btn.svelte-w11odb")),
-      CONFIG.TIMEOUT,
-      "Search button not found"
+      CONFIG.TIMEOUT
     );
     await buttonElement.click();
 
-    console.log("Waiting for results to load...");
     await driver.wait(
       until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-      CONFIG.TIMEOUT,
-      "Search results not loaded"
+      CONFIG.TIMEOUT
     );
   } catch (error) {
     console.error("Error during search:", error.message);
@@ -65,61 +57,82 @@ async function searchLocation(driver) {
   }
 }
 
-// Display names and addresses of results
+// Fonction d'affichage des résultats sous forme de tableau
 async function displayNamesAndAddresses(driver) {
   try {
-    console.log("Fetching results...");
-
-    // Wait for the results container to load
     const resultsContainer = await driver.wait(
       until.elementLocated(By.className("fr-grid-row fr-grid-row--gutters svelte-11sc5my")),
-      CONFIG.TIMEOUT,
-      "Results container not found"
+      CONFIG.TIMEOUT
     );
 
-    // Get all list items (residences)
     const listItems = await resultsContainer.findElements(By.tagName("li"));
+    const logements = [];
 
-    if (listItems.length === 0) {
-      console.log("No results found.");
-      return;
-    }
-
-    // Extract and display names and addresses
     for (const item of listItems) {
       let titleText = '';
       let addressText = '';
 
-      // Try to get the title
       try {
         const titleElement = await item.findElement(By.css(".fr-card__title a"));
         titleText = await titleElement.getText();
-      } catch (error) {
-        console.log("Title element not found in this result.");
-      }
+      } catch (error) {}
 
-      // Try to get the address
       try {
         const addressElement = await item.findElement(By.css(".fr-card__desc"));
         addressText = await addressElement.getText();
-      } catch (error) {
-        console.log("Address element not found in this result.");
-      }
+      } catch (error) {}
 
       if (titleText && addressText) {
-        console.log(`Name: ${titleText}`);
-        console.log(`Address: ${addressText}`);
-      } else {
-        console.log("Some elements are missing in this result.");
+        logements.push({ nom: titleText, adresse: addressText });
       }
     }
+
+    return logements;
   } catch (error) {
     console.error("Error during result extraction:", error.message);
+    return [];
   }
 }
 
-// Main execution function
-async function main() {
+// Fonction pour comparer deux listes de logements
+function areLogementsDifferent(oldLogements, newLogements) {
+  if (oldLogements.length !== newLogements.length) {
+    return true;
+  }
+
+  for (let i = 0; i < oldLogements.length; i++) {
+    if (
+      oldLogements[i].nom !== newLogements[i].nom ||
+      oldLogements[i].adresse !== newLogements[i].adresse
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Fonction pour créer le message de statut des logements
+function createLogementStatusMessage(logements) {
+  let message = '📊 **Rapport quotidien du bot de surveillance des logements**\n\n';
+  
+  if (logements.length === 0) {
+    message += '❌ Aucun logement n\'est actuellement disponible.';
+  } else {
+    message += `✅ **${logements.length} logement(s) disponible(s) :**\n\n`;
+    logements.forEach((logement, index) => {
+      message += `${index + 1}. **Nom**: ${logement.nom}\n   **Adresse**: ${logement.adresse}\n\n`;
+    });
+  }
+
+  message += '\n🤖 Le bot continue de surveiller les changements toutes les 20 secondes.';
+  return message;
+}
+
+// Fonction principale d'exécution
+let previousLogements = []; // Stockage de l'état initial
+
+async function executeSearchAndNotify(client) {
   let driver;
 
   try {
@@ -128,17 +141,36 @@ async function main() {
       .setFirefoxOptions(getFirefoxOptions())
       .build();
 
-    // Navigate to website
     await driver.get(CONFIG.URL);
-
-    // Perform search
     await searchLocation(driver);
 
-    // Display the names and addresses of the search results
-    await displayNamesAndAddresses(driver);
+    const logements = await displayNamesAndAddresses(driver);
+
+    if (areLogementsDifferent(previousLogements, logements)) {
+      previousLogements = logements; // Mise à jour des logements précédents
+
+      if (logements.length > 0) {
+        const channel = await client.channels.fetch(CHANNEL_ID);
+
+        let logementMessage = '⚡ Un changement dans les logements a été détecté !\n\nVoici la liste mise à jour :\n';
+
+        logements.forEach(logement => {
+          logementMessage += `**Nom**: ${logement.nom}\n**Adresse**: ${logement.adresse}\n\n`;
+        });
+
+        channel.send(logementMessage);
+      } else {
+        const channel = await client.channels.fetch(CHANNEL_ID);
+        channel.send("⚡ Les logements ont changé, mais aucun nouveau logement n'est disponible !");
+      }
+    } else {
+      console.log("Aucun changement détecté dans les logements.");
+    }
+
+    return logements; // Retourner les logements pour le rapport quotidien
   } catch (error) {
     console.error("Error during execution:", error.message);
-    throw error;
+    return [];
   } finally {
     if (driver) {
       await driver.quit();
@@ -146,22 +178,39 @@ async function main() {
   }
 }
 
-// Execute the script
-if (require.main === module) {
-  main()
-    .then((result) => {
-      console.log("Script completed successfully");
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error("Script failed:", error);
-      process.exit(1);
-    });
-}
+// Créer le client Discord
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages
+  ]
+});
 
-// Export for testing
-module.exports = {
-  searchLocation,
-  displayNamesAndAddresses,
-  main
-};
+// Quand le bot est prêt
+client.once('ready', () => {
+  console.log('Le bot est prêt !');
+
+  // Exécuter la recherche toutes les 20 secondes
+  setInterval(async () => {
+    console.log("Exécution du script...");
+    await executeSearchAndNotify(client);
+  }, CONFIG.CHECK_INTERVAL);
+
+  // Envoyer un rapport quotidien
+  setInterval(async () => {
+    console.log("Génération du rapport quotidien...");
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    const logements = await executeSearchAndNotify(client);
+    const statusMessage = createLogementStatusMessage(logements);
+    channel.send(statusMessage);
+  }, CONFIG.DAILY_STATUS_INTERVAL);
+
+  // Envoyer un message initial pour confirmer que le bot est en marche
+  (async () => {
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    channel.send("🟢 Le bot de surveillance des logements est maintenant actif et opérationnel !");
+  })();
+});
+
+// Connecter le bot à Discord
+client.login(BOT_TOKEN);
